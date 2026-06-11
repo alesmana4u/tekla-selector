@@ -199,7 +199,6 @@ namespace TeklaSelector
                 while (deselectAll.MoveNext())
                 {
                     ModelObject obj = deselectAll.Current;
-                    // Use Select with no arguments (default behavior in Tekla 2022)
                     obj.Select();
                 }
 
@@ -238,14 +237,11 @@ namespace TeklaSelector
                 if (part != null)
                 {
                     // Method 1: Get from user-defined properties
-                    // Note: In Tekla 2022, GetUserProperty may require ref parameter or specific enum
                     try
                     {
-                        object phaseObj = null;
-                        // Try using GetDynamicStringProperty
-                        if (part.GetDynamicStringProperty("PHASE", ref phaseObj))
+                        string phaseValue = "";
+                        if (part.GetUserProperty("PHASE", ref phaseValue))
                         {
-                            string phaseValue = phaseObj as string;
                             if (!string.IsNullOrEmpty(phaseValue))
                             {
                                 if (!phaseValue.StartsWith("SEQ-", StringComparison.OrdinalIgnoreCase))
@@ -256,13 +252,28 @@ namespace TeklaSelector
                     }
                     catch { }
 
-                    // Method 2: Try GetReportProperty with ref parameter
+                    // Method 2: Try GetReportProperty with ref string parameter
                     try
                     {
-                        object phaseObj = null;
-                        if (part.GetReportProperty("PHASE", ref phaseObj))
+                        string phaseValue = "";
+                        if (part.GetReportProperty("PHASE", ref phaseValue))
                         {
-                            string phaseValue = phaseObj as string;
+                            if (!string.IsNullOrEmpty(phaseValue))
+                            {
+                                if (!phaseValue.StartsWith("SEQ-", StringComparison.OrdinalIgnoreCase))
+                                    return $"SEQ-{phaseValue}";
+                                return phaseValue.ToUpper();
+                            }
+                        }
+                    }
+                    catch { }
+
+                    // Method 3: Try GetDynamicStringProperty
+                    try
+                    {
+                        string phaseValue = "";
+                        if (part.GetDynamicStringProperty("PHASE", ref phaseValue))
+                        {
                             if (!string.IsNullOrEmpty(phaseValue))
                             {
                                 if (!phaseValue.StartsWith("SEQ-", StringComparison.OrdinalIgnoreCase))
@@ -280,10 +291,9 @@ namespace TeklaSelector
                 {
                     try
                     {
-                        object phaseObj = null;
-                        if (assembly.GetReportProperty("PHASE", ref phaseObj))
+                        string phaseValue = "";
+                        if (assembly.GetReportProperty("PHASE", ref phaseValue))
                         {
-                            string phaseValue = phaseObj as string;
                             if (!string.IsNullOrEmpty(phaseValue))
                             {
                                 if (!phaseValue.StartsWith("SEQ-", StringComparison.OrdinalIgnoreCase))
