@@ -185,23 +185,26 @@ namespace TeklaSelector
 
         /// <summary>
         /// Select steel objects based on phase/sequence
+        /// Tekla 2022 compatible version
         /// </summary>
         private int SelectSteelObjects()
         {
             try
             {
-                // First, deselect all existing selections
                 ModelObjectEnumerator allObjects = teklaModel.GetModelObjectSelector().GetAllObjects();
-                while (allObjects.MoveNext())
-                {
-                    ModelObject obj = allObjects.Current;
-                    obj.Select(false);
-                }
-
-                // Now select objects that match our sequences
-                allObjects = teklaModel.GetModelObjectSelector().GetAllObjects();
                 int objectsSelected = 0;
 
+                // Deselect all first
+                ModelObjectEnumerator deselectAll = teklaModel.GetModelObjectSelector().GetAllObjects();
+                while (deselectAll.MoveNext())
+                {
+                    ModelObject obj = deselectAll.Current;
+                    // Use Select with no arguments (default behavior in Tekla 2022)
+                    obj.Select();
+                }
+
+                // Now select matching objects
+                allObjects = teklaModel.GetModelObjectSelector().GetAllObjects();
                 while (allObjects.MoveNext())
                 {
                     ModelObject obj = allObjects.Current;
@@ -209,7 +212,7 @@ namespace TeklaSelector
 
                     if (!string.IsNullOrEmpty(phase) && selectedSequences.Contains(phase))
                     {
-                        obj.Select(true);
+                        obj.Select();
                         objectsSelected++;
                     }
                 }
@@ -224,68 +227,69 @@ namespace TeklaSelector
 
         /// <summary>
         /// Extract phase/sequence information from model object
-        /// Supports multiple property lookup methods
+        /// Tekla 2022 compatible version
         /// </summary>
         private string GetPhaseFromObject(ModelObject obj)
         {
             try
             {
-                // Try to cast to Part first
+                // Try to cast to Part
                 Part part = obj as Part;
                 if (part != null)
                 {
-                    // Method 1: Get from user-defined properties with EnumAttributes
+                    // Method 1: Get from user-defined properties
+                    // Note: In Tekla 2022, GetUserProperty may require ref parameter or specific enum
                     try
                     {
-                        string phaseValue = part.GetUserProperty("PHASE", "");
-                        if (!string.IsNullOrEmpty(phaseValue))
+                        object phaseObj = null;
+                        // Try using GetDynamicStringProperty
+                        if (part.GetDynamicStringProperty("PHASE", ref phaseObj))
                         {
-                            if (!phaseValue.StartsWith("SEQ-", StringComparison.OrdinalIgnoreCase))
-                                return $"SEQ-{phaseValue}";
-                            return phaseValue.ToUpper();
+                            string phaseValue = phaseObj as string;
+                            if (!string.IsNullOrEmpty(phaseValue))
+                            {
+                                if (!phaseValue.StartsWith("SEQ-", StringComparison.OrdinalIgnoreCase))
+                                    return $"SEQ-{phaseValue}";
+                                return phaseValue.ToUpper();
+                            }
                         }
                     }
                     catch { }
 
-                    // Method 2: Get from report properties
+                    // Method 2: Try GetReportProperty with ref parameter
                     try
                     {
-                        string phaseValue = part.GetReportProperty("PHASE", "");
-                        if (!string.IsNullOrEmpty(phaseValue))
+                        object phaseObj = null;
+                        if (part.GetReportProperty("PHASE", ref phaseObj))
                         {
-                            if (!phaseValue.StartsWith("SEQ-", StringComparison.OrdinalIgnoreCase))
-                                return $"SEQ-{phaseValue}";
-                            return phaseValue.ToUpper();
-                        }
-                    }
-                    catch { }
-
-                    // Method 3: Try accessing Phase directly from part properties
-                    try
-                    {
-                        string phaseValue = part.Phase;
-                        if (!string.IsNullOrEmpty(phaseValue))
-                        {
-                            if (!phaseValue.StartsWith("SEQ-", StringComparison.OrdinalIgnoreCase))
-                                return $"SEQ-{phaseValue}";
-                            return phaseValue.ToUpper();
+                            string phaseValue = phaseObj as string;
+                            if (!string.IsNullOrEmpty(phaseValue))
+                            {
+                                if (!phaseValue.StartsWith("SEQ-", StringComparison.OrdinalIgnoreCase))
+                                    return $"SEQ-{phaseValue}";
+                                return phaseValue.ToUpper();
+                            }
                         }
                     }
                     catch { }
                 }
 
-                // Try Assembly as well
+                // Try Assembly
                 Assembly assembly = obj as Assembly;
                 if (assembly != null)
                 {
                     try
                     {
-                        string phaseValue = assembly.Phase;
-                        if (!string.IsNullOrEmpty(phaseValue))
+                        object phaseObj = null;
+                        if (assembly.GetReportProperty("PHASE", ref phaseObj))
                         {
-                            if (!phaseValue.StartsWith("SEQ-", StringComparison.OrdinalIgnoreCase))
-                                return $"SEQ-{phaseValue}";
-                            return phaseValue.ToUpper();
+                            string phaseValue = phaseObj as string;
+                            if (!string.IsNullOrEmpty(phaseValue))
+                            {
+                                if (!phaseValue.StartsWith("SEQ-", StringComparison.OrdinalIgnoreCase))
+                                    return $"SEQ-{phaseValue}";
+                                return phaseValue.ToUpper();
+                            }
                         }
                     }
                     catch { }
@@ -293,7 +297,7 @@ namespace TeklaSelector
             }
             catch
             {
-                // Silent fail - object might not have phase info
+                // Silent fail
             }
 
             return null;
